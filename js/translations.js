@@ -29,6 +29,7 @@ export const UI_TEXT = {
     leave: "Выйти",
     waitingPlayers: "Ждём остальных игроков...",
     resultSettingsTitle: "Параметры матча",
+    leaderboardTitle: "Таблица лидеров",
     playAgain: "Сыграть ещё раз",
     goHome: "На главную",
     needName: "Введи имя",
@@ -67,6 +68,8 @@ export const UI_TEXT = {
     resultTie: "Ничья!",
     resultWinYou: "Ты победил!",
     resultWinOther: (name) => `Победил ${name}!`,
+    placeLabel: (place) => `${place} место`,
+    championScore: (score, correct, accuracy) => `${score} очков · ${correct} верно · ${accuracy}% accuracy`,
     settingsSummary: (mode, difficulty, total, time) => `Режим: ${mode} · Сложность: ${difficulty} · ${total} вопросов · ${time} секунд на вопрос`,
     secondsShort: (s) => `${s}s`,
     categories: {
@@ -130,6 +133,7 @@ export const UI_TEXT = {
     leave: "Leave",
     waitingPlayers: "Waiting for the other players...",
     resultSettingsTitle: "Match settings",
+    leaderboardTitle: "Leaderboard",
     playAgain: "Play again",
     goHome: "Back home",
     needName: "Enter your name",
@@ -168,6 +172,8 @@ export const UI_TEXT = {
     resultTie: "It is a tie!",
     resultWinYou: "You won!",
     resultWinOther: (name) => `${name} won!`,
+    placeLabel: (place) => `${place}${place === 1 ? "st" : place === 2 ? "nd" : place === 3 ? "rd" : "th"} place`,
+    championScore: (score, correct, accuracy) => `${score} points · ${correct} correct · ${accuracy}% accuracy`,
     settingsSummary: (mode, difficulty, total, time) => `Mode: ${mode} · Difficulty: ${difficulty} · ${total} questions · ${time} seconds per question`,
     secondsShort: (s) => `${s}s`,
     categories: {
