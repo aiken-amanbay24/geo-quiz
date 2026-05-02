@@ -16,6 +16,15 @@ export const UI_TEXT = {
     matchSettingsTitle: "Параметры матча",
     modeLabel: "Режим игры",
     difficultyLabel: "Сложность",
+    powerupsTitle: "Бонусы",
+    powerupsLeft: (count) => `Осталось использований: ${count}`,
+    powerupUsed: "Использовано",
+    powerupDescriptions: {
+      fiftyFifty: "Убирает 2 неверных ответа",
+      doublePoints: "Следующий верный ответ x2",
+      freezeTime: "Добавляет +5 секунд тебе",
+      shield: "Защищает от штрафа за ошибку"
+    },
     startGame: "Начать игру",
     leave: "Выйти",
     waitingPlayers: "Ждём остальных игроков...",
@@ -38,6 +47,14 @@ export const UI_TEXT = {
     correct: (points, fact) => `✓ Верно! +${points} очков. ${fact}`,
     wrong: (answer, fact) => `✗ Неверно. Правильный ответ: ${answer}. ${fact}`,
     timeout: (answer, fact) => `⏰ Время вышло. Правильный ответ: ${answer}. ${fact}`,
+    shieldSaved: "Щит сработал и спас тебя от штрафа.",
+    penaltyNotice: (points) => `Штраф: ${points} очков.`,
+    bonusActivated: {
+      fiftyFifty: "50/50 активирован.",
+      doublePoints: "Double Points активирован.",
+      freezeTime: "Freeze Time активирован: +5 секунд.",
+      shield: "Shield активирован."
+    },
     waitingAnswers: (left, total) => `Ждём ответа: ${left} из ${total}`,
     leaderSolo: (name) => `${name} задаёт темп матчу.`,
     leaderFire: (name) => `${name} is on fire! 🔥`,
@@ -77,6 +94,12 @@ export const UI_TEXT = {
       easy: "Easy",
       medium: "Medium",
       hard: "Hard"
+    },
+    powerups: {
+      fiftyFifty: "50/50",
+      doublePoints: "Double Points",
+      freezeTime: "Freeze Time",
+      shield: "Shield"
     }
   },
   en: {
@@ -94,6 +117,15 @@ export const UI_TEXT = {
     matchSettingsTitle: "Match settings",
     modeLabel: "Game mode",
     difficultyLabel: "Difficulty",
+    powerupsTitle: "Power-ups",
+    powerupsLeft: (count) => `Uses left: ${count}`,
+    powerupUsed: "Used",
+    powerupDescriptions: {
+      fiftyFifty: "Removes 2 wrong answers",
+      doublePoints: "Next correct answer is x2",
+      freezeTime: "Adds +5 seconds for you",
+      shield: "Blocks the wrong-answer penalty"
+    },
     startGame: "Start game",
     leave: "Leave",
     waitingPlayers: "Waiting for the other players...",
@@ -116,6 +148,14 @@ export const UI_TEXT = {
     correct: (points, fact) => `✓ Correct! +${points} points. ${fact}`,
     wrong: (answer, fact) => `✗ Incorrect. Correct answer: ${answer}. ${fact}`,
     timeout: (answer, fact) => `⏰ Time is up. Correct answer: ${answer}. ${fact}`,
+    shieldSaved: "Shield activated and blocked the penalty.",
+    penaltyNotice: (points) => `Penalty: ${points} points.`,
+    bonusActivated: {
+      fiftyFifty: "50/50 activated.",
+      doublePoints: "Double Points activated.",
+      freezeTime: "Freeze Time activated: +5 seconds.",
+      shield: "Shield activated."
+    },
     waitingAnswers: (left, total) => `Waiting for answers: ${left} of ${total}`,
     leaderSolo: (name) => `${name} is setting the pace.`,
     leaderFire: (name) => `${name} is on fire! 🔥`,
@@ -155,6 +195,12 @@ export const UI_TEXT = {
       easy: "Easy",
       medium: "Medium",
       hard: "Hard"
+    },
+    powerups: {
+      fiftyFifty: "50/50",
+      doublePoints: "Double Points",
+      freezeTime: "Freeze Time",
+      shield: "Shield"
     }
   }
 };
