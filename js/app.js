@@ -91,7 +91,6 @@ document.getElementById("btn-create-room").addEventListener("click", createRoom)
 document.getElementById("btn-join-room").addEventListener("click", joinRoom);
 document.getElementById("btn-start").addEventListener("click", startGame);
 document.getElementById("btn-leave-room").addEventListener("click", leaveRoom);
-document.getElementById("btn-play-again").addEventListener("click", playAgain);
 document.getElementById("btn-go-home").addEventListener("click", goHome);
 document.querySelectorAll(".lang-btn").forEach((button) => {
   button.addEventListener("click", () => setLanguage(button.dataset.lang || DEFAULT_LANGUAGE));
@@ -167,7 +166,6 @@ function renderStaticText() {
   document.getElementById("waiting-text").textContent = t().waitingPlayers;
   document.getElementById("result-settings-title").textContent = t().resultSettingsTitle;
   els.leaderboardTitle.textContent = t().leaderboardTitle;
-  document.getElementById("btn-play-again").textContent = t().playAgain;
   document.getElementById("btn-go-home").textContent = t().goHome;
 }
 
