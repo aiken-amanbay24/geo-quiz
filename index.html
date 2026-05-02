@@ -1,752 +1,122 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GeoQuiz — Онлайн викторина</title>
-
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700&family=Manrope:wght@400;500;600&display=swap');
-
-  :root {
-    --bg: #0e0e10;
-    --surface: #18181c;
-    --surface2: #222228;
-    --border: rgba(255,255,255,0.08);
-    --border2: rgba(255,255,255,0.15);
-    --text: #f0f0f4;
-    --muted: #888899;
-    --accent: #7c6cfa;
-    --accent2: #a594ff;
-    --green: #22c55e;
-    --red: #ef4444;
-    --yellow: #f59e0b;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Manrope', sans-serif;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1.5rem;
-  }
-
-  #app { width: 100%; max-width: 520px; }
-
-  .screen { display: none; }
-  .screen.active { display: block; }
-
-  .logo {
-    font-family: 'Unbounded', sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.15em;
-    color: var(--accent2);
-    text-transform: uppercase;
-    margin-bottom: 2.5rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
-
-  .home-title {
-    font-family: 'Unbounded', sans-serif;
-    font-size: 32px;
-    font-weight: 700;
-    line-height: 1.15;
-    margin-bottom: 10px;
-    background: linear-gradient(135deg, #fff 30%, var(--accent2));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .home-sub { font-size: 15px; color: var(--muted); margin-bottom: 2.5rem; line-height: 1.6; }
-
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 1.5rem;
-    margin-bottom: 12px;
-  }
-  .card-title { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 1rem; }
-
-  input[type="text"] {
-    width: 100%;
-    background: var(--surface2);
-    border: 1px solid var(--border2);
-    border-radius: 10px;
-    padding: 12px 16px;
-    font-size: 15px;
-    color: var(--text);
-    font-family: 'Manrope', sans-serif;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  input[type="text"]:focus { border-color: var(--accent); }
-  input[type="text"]::placeholder { color: var(--muted); }
-
-  .btn {
-    display: block;
-    width: 100%;
-    padding: 14px;
-    border-radius: 12px;
-    font-size: 15px;
-    font-weight: 600;
-    font-family: 'Manrope', sans-serif;
-    cursor: pointer;
-    border: none;
-    transition: all 0.15s;
-    text-align: center;
-  }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover { background: var(--accent2); transform: translateY(-1px); }
-  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border2); margin-top: 8px; }
-  .btn-outline:hover { background: var(--surface2); }
-  .btn:disabled { opacity: 0.4; cursor: default; transform: none; }
-
-  .room-code-display {
-    font-family: 'Unbounded', sans-serif;
-    font-size: 36px;
-    font-weight: 700;
-    text-align: center;
-    letter-spacing: 0.2em;
-    color: var(--accent2);
-    padding: 1rem 0;
-  }
-  .room-hint { text-align: center; font-size: 13px; color: var(--muted); margin-bottom: 1.5rem; }
-
-  .players-in-room { display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.5rem; }
-  .player-slot {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 14px;
-    background: var(--surface2);
-    border-radius: 10px;
-    border: 1px solid var(--border);
-    font-size: 14px;
-  }
-  .player-slot .avatar {
-    width: 32px; height: 32px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 700;
-    background: var(--accent); color: #fff; flex-shrink: 0;
-  }
-  .player-slot.waiting { border-style: dashed; opacity: 0.5; }
-  .player-slot.waiting .avatar { background: var(--surface); border: 1px dashed var(--border2); }
-  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); margin-left: auto; }
-
-  .quiz-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-  .q-num { font-size: 13px; color: var(--muted); }
-  .q-scores { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-  .score-chip {
-    font-size: 12px; font-weight: 600;
-    padding: 4px 10px; border-radius: 99px;
-    background: var(--surface2); border: 1px solid var(--border);
-  }
-
-  .progress-track { height: 3px; background: var(--border); border-radius: 99px; margin-bottom: 1.5rem; overflow: hidden; }
-  .progress-bar { height: 100%; background: var(--accent); border-radius: 99px; transition: width 0.5s ease; }
-
-  .cat-tag {
-    display: inline-block; font-size: 11px; font-weight: 600;
-    padding: 3px 10px; border-radius: 99px; margin-bottom: 14px;
-    background: rgba(124,108,250,0.15); color: var(--accent2);
-    border: 1px solid rgba(124,108,250,0.3);
-    text-transform: uppercase; letter-spacing: 0.05em;
-  }
-  .q-flag { font-size: 56px; text-align: center; display: block; margin-bottom: 1rem; }
-  .q-text { font-size: 18px; font-weight: 600; line-height: 1.45; margin-bottom: 0.75rem; }
-  .q-hint { font-size: 13px; color: var(--muted); margin-bottom: 1.5rem; padding: 10px 14px; background: var(--surface2); border-radius: 8px; }
-
-  .options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.5rem; }
-  .opt {
-    padding: 14px 14px;
-    border: 1px solid var(--border2);
-    border-radius: 12px;
-    background: var(--surface);
-    color: var(--text);
-    font-size: 14px; font-weight: 500;
-    font-family: 'Manrope', sans-serif;
-    cursor: pointer;
-    text-align: left;
-    transition: all 0.15s;
-    line-height: 1.4;
-  }
-  .opt:hover:not(:disabled) { background: var(--surface2); border-color: var(--accent); }
-  .opt.correct { background: rgba(34,197,94,0.12); border-color: var(--green); color: var(--green); }
-  .opt.wrong { background: rgba(239,68,68,0.12); border-color: var(--red); color: var(--red); }
-  .opt:disabled { cursor: default; }
-
-  .feedback {
-    padding: 12px 16px; border-radius: 10px;
-    font-size: 14px; line-height: 1.6;
-    margin-bottom: 1rem; display: none;
-  }
-  .feedback.show { display: block; }
-  .feedback.ok { background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
-  .feedback.bad { background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
-
-  .opp-status {
-    font-size: 13px; color: var(--muted);
-    text-align: center; margin-bottom: 1rem;
-    min-height: 20px;
-  }
-
-  .waiting-next { text-align: center; padding: 0.5rem 0 1rem; }
-  .waiting-dots { display: flex; justify-content: center; gap: 6px; margin: 1rem 0; }
-  .waiting-dots span {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: var(--accent);
-    animation: pulse 1.2s infinite;
-  }
-  .waiting-dots span:nth-child(2) { animation-delay: 0.2s; }
-  .waiting-dots span:nth-child(3) { animation-delay: 0.4s; }
-  @keyframes pulse { 0%,100%{opacity:0.2} 50%{opacity:1} }
-
-  .result-hero { text-align: center; padding: 1.5rem 0 1rem; }
-  .result-trophy { font-size: 52px; margin-bottom: 10px; }
-  .result-headline {
-    font-family: 'Unbounded', sans-serif;
-    font-size: 20px; font-weight: 700;
-    margin-bottom: 6px;
-  }
-  .result-sub { font-size: 14px; color: var(--muted); margin-bottom: 2rem; }
-
-  .scoreboard { display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.5rem; }
-  .sb-row {
-    display: flex; align-items: center; gap: 14px;
-    padding: 14px 16px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-  }
-  .sb-row.top { border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.06); }
-  .sb-rank { font-size: 20px; width: 28px; text-align: center; }
-  .sb-info { flex: 1; }
-  .sb-name { font-size: 15px; font-weight: 600; }
-  .sb-detail { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .sb-pts { font-family: 'Unbounded', sans-serif; font-size: 18px; font-weight: 700; color: var(--accent2); }
-
-  .error-msg { color: var(--red); font-size: 13px; margin-top: 8px; min-height: 20px; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoQuiz — Онлайн викторина</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles/main.css">
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
-<div id="app">
-
-  <div id="screen-home" class="screen active">
-    <div class="logo"><div class="logo-dot"></div>GeoQuiz Online</div>
-    <div class="home-title">Викторина<br>по географии</div>
-    <div class="home-sub">Соревнуйся с другом в реальном времени — каждый со своего устройства.</div>
-
-    <div class="card">
-      <div class="card-title">Твоё имя</div>
-      <input type="text" id="input-name" placeholder="Введи имя" maxlength="20" />
-    </div>
-
-    <button class="btn btn-primary" onclick="createRoom()" style="margin-bottom:8px">Создать комнату</button>
-
-    <div class="card" style="margin-top:16px">
-      <div class="card-title">Войти по коду</div>
-      <input type="text" id="input-code" placeholder="Код комнаты (4 буквы)" maxlength="4"
-        style="text-transform:uppercase;letter-spacing:0.15em;font-family:'Unbounded',sans-serif;font-size:18px" />
-      <div class="error-msg" id="join-error"></div>
-      <button class="btn btn-outline" onclick="joinRoom()" style="margin-top:10px">Войти в комнату</button>
-    </div>
-  </div>
-
-  <div id="screen-lobby" class="screen">
-    <div class="logo"><div class="logo-dot"></div>GeoQuiz Online</div>
-    <div class="card-title" style="margin-bottom:8px">Код комнаты — поделись с другом:</div>
-    <div class="room-code-display" id="lobby-code"></div>
-    <div class="room-hint">Жди, пока друг введёт этот код</div>
-
-    <div class="players-in-room" id="lobby-players"></div>
-
-    <button class="btn btn-primary" id="btn-start" onclick="startGame()" disabled>
-      Начать игру
-    </button>
-    <button class="btn btn-outline" onclick="leaveRoom()">Выйти</button>
-  </div>
-
-  <div id="screen-quiz" class="screen">
-    <div class="quiz-meta">
-      <div class="q-num" id="q-num">Вопрос 1 / 10</div>
-      <div class="q-scores" id="q-scores"></div>
-    </div>
-    <div class="progress-track"><div class="progress-bar" id="q-bar" style="width:0%"></div></div>
-
-    <div class="cat-tag" id="q-cat"></div>
-    <div class="q-flag" id="q-flag"></div>
-    <div class="q-text" id="q-text"></div>
-    <div class="q-hint" id="q-hint"></div>
-
-    <div class="options" id="q-opts"></div>
-    <div class="feedback" id="q-fb"></div>
-    <div class="opp-status" id="opp-status"></div>
-
-    <div class="waiting-next" id="waiting-next" style="display:none">
-      <div style="font-size:13px;color:var(--muted)">Ждём остальных игроков...</div>
-      <div class="waiting-dots"><span></span><span></span><span></span></div>
-    </div>
-  </div>
-
-  <div id="screen-results" class="screen">
-    <div class="result-hero">
-      <div class="result-trophy" id="res-trophy"></div>
-      <div class="result-headline" id="res-headline"></div>
-      <div class="result-sub" id="res-sub"></div>
-    </div>
-    <div class="scoreboard" id="scoreboard"></div>
-    <button class="btn btn-primary" onclick="playAgain()">Сыграть ещё раз</button>
-    <button class="btn btn-outline" onclick="goHome()">На главную</button>
-  </div>
-
-</div>
-
-<script>
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDSS7uM_3ohyNbpCUPElcAqGHHiaTehIbc",
-  authDomain: "geography-quiz-861fa.firebaseapp.com",
-  databaseURL: "https://geography-quiz-861fa-default-rtdb.firebaseio.com",
-  projectId: "geography-quiz-861fa",
-  storageBucket: "geography-quiz-861fa.firebasestorage.app",
-  messagingSenderId: "481451699372",
-  appId: "1:481451699372:web:aaea77b2f1280031cb8309"
-};
-
-firebase.initializeApp(FIREBASE_CONFIG);
-const db = firebase.database();
-
-const QUESTIONS_PER_GAME = 10;
-
-const QUESTIONS = [
-  { flag: '🇧🇷', q: 'Чей это флаг?', answer: 'Бразилия', options: ['Бразилия', 'Аргентина', 'Мексика', 'Колумбия'], hint: 'Самая большая страна Южной Америки', fact: 'Бразилия — единственная португалоязычная страна в Южной Америке.', cat: 'Флаги' },
-  { flag: '🇯🇵', q: 'Какова столица Японии?', answer: 'Токио', options: ['Токио', 'Осака', 'Киото', 'Хиросима'], hint: 'Крупнейший мегаполис мира', fact: 'Токио — более 37 млн человек в агломерации.', cat: 'Столицы' },
-  { flag: '🇨🇦', q: 'Чей это флаг?', answer: 'Канада', options: ['Канада', 'США', 'Австралия', 'Швейцария'], hint: 'На флаге — лист местного дерева', fact: 'Канада — вторая по площади страна мира.', cat: 'Флаги' },
-  { flag: '🌍', q: 'Какая страна самая большая по площади?', answer: 'Россия', options: ['Россия', 'Китай', 'США', 'Канада'], hint: 'Более 17 млн км²', fact: 'Россия охватывает 11 часовых поясов.', cat: 'Факты' },
-  { flag: '🇫🇷', q: 'Какова столица Франции?', answer: 'Париж', options: ['Париж', 'Марсель', 'Лион', 'Ницца'], hint: 'Город Эйфелевой башни', fact: 'Париж ежегодно посещают миллионы туристов.', cat: 'Столицы' },
-  { flag: '🇦🇺', q: 'Чей это флаг?', answer: 'Австралия', options: ['Австралия', 'Новая Зеландия', 'Великобритания', 'Фиджи'], hint: 'Единственная страна-континент', fact: 'Австралия — единственный континент, занятый одной страной.', cat: 'Флаги' },
-  { flag: '🌊', q: 'Какой океан самый большой?', answer: 'Тихий', options: ['Тихий', 'Атлантический', 'Индийский', 'Северный Ледовитый'], hint: 'Покрывает треть поверхности Земли', fact: 'Тихий океан больше всех материков вместе взятых.', cat: 'Факты' },
-  { flag: '🇩🇪', q: 'Какова столица Германии?', answer: 'Берлин', options: ['Берлин', 'Мюнхен', 'Гамбург', 'Франкфурт'], hint: 'Крупнейший город страны', fact: 'Берлинская стена разделяла город с 1961 по 1989 год.', cat: 'Столицы' },
-  { flag: '🇿🇦', q: 'Чей это флаг?', answer: 'ЮАР', options: ['ЮАР', 'Нигерия', 'Кения', 'Эфиопия'], hint: 'Самая южная страна Африки', fact: 'ЮАР — одна из немногих стран с несколькими столицами.', cat: 'Флаги' },
-  { flag: '⛰️', q: 'Самая высокая гора в мире?', answer: 'Эверест', options: ['Эверест', 'К2', 'Килиманджаро', 'Монблан'], hint: 'Гималаи', fact: 'Впервые вершину покорили в 1953 году.', cat: 'Факты' },
-  { flag: '🇧🇷', q: 'Какова столица Бразилии?', answer: 'Бразилиа', options: ['Бразилиа', 'Рио-де-Жанейро', 'Сан-Паулу', 'Сальвадор'], hint: 'Построена специально в 1960 году', fact: 'Бразилиа строилась как новая административная столица.', cat: 'Столицы' },
-  { flag: '🇨🇳', q: 'Чей это флаг?', answer: 'Китай', options: ['Китай', 'Вьетнам', 'Северная Корея', 'Лаос'], hint: 'Красный фон, жёлтые звёзды', fact: 'Флаг КНР используется с 1949 года.', cat: 'Флаги' },
-  { flag: '🇪🇬', q: 'В какой стране пирамиды Гизы?', answer: 'Египет', options: ['Египет', 'Судан', 'Ливия', 'Марокко'], hint: 'Страна на берегу Нила', fact: 'Великая пирамида — одно из самых известных сооружений мира.', cat: 'Факты' },
-  { flag: '🇮🇳', q: 'Какова столица Индии?', answer: 'Нью-Дели', options: ['Нью-Дели', 'Мумбаи', 'Калькутта', 'Бангалор'], hint: 'Новый город, построенный британцами', fact: 'Нью-Дели стал столицей в 1931 году.', cat: 'Столицы' },
-  { flag: '🌐', q: 'На каком континенте находится Казахстан?', answer: 'Оба континента', options: ['Азия', 'Европа', 'Оба континента', 'Центральная Азия'], hint: 'Часть территории лежит западнее Урала', fact: 'Казахстан расположен и в Азии, и частично в Европе.', cat: 'Факты' },
-  { flag: '🇮🇹', q: 'Какова столица Италии?', answer: 'Рим', options: ['Рим', 'Милан', 'Неаполь', 'Флоренция'], hint: 'Город Колизея', fact: 'Рим часто называют Вечным городом.', cat: 'Столицы' },
-  { flag: '🇪🇸', q: 'Чей это флаг?', answer: 'Испания', options: ['Испания', 'Португалия', 'Италия', 'Румыния'], hint: 'Красно-жёлто-красные полосы', fact: 'Современный флаг Испании используется с конца XX века.', cat: 'Флаги' },
-  { flag: '🏜️', q: 'Какая пустыня самая большая в мире?', answer: 'Сахара', options: ['Сахара', 'Гоби', 'Атакама', 'Калахари'], hint: 'Находится в Африке', fact: 'Сахара занимает огромную часть Северной Африки.', cat: 'Факты' },
-  { flag: '🇦🇷', q: 'Какова столица Аргентины?', answer: 'Буэнос-Айрес', options: ['Буэнос-Айрес', 'Кордова', 'Мендоса', 'Росарио'], hint: 'Крупнейший город страны', fact: 'Название города переводят как «хорошие ветры».', cat: 'Столицы' },
-  { flag: '🇲🇽', q: 'Чей это флаг?', answer: 'Мексика', options: ['Мексика', 'Италия', 'Венгрия', 'Иран'], hint: 'В центре герба — орёл со змеёй', fact: 'Герб на флаге основан на ацтекской легенде.', cat: 'Флаги' },
-  { flag: '🌋', q: 'В какой стране находится вулкан Фудзи?', answer: 'Япония', options: ['Япония', 'Китай', 'Индонезия', 'Филиппины'], hint: 'Островное государство в Восточной Азии', fact: 'Фудзи — один из символов Японии.', cat: 'Факты' },
-  { flag: '🇬🇧', q: 'Какова столица Великобритании?', answer: 'Лондон', options: ['Лондон', 'Манчестер', 'Бирмингем', 'Ливерпуль'], hint: 'Город Биг-Бена', fact: 'Лондон стоит на реке Темзе.', cat: 'Столицы' },
-  { flag: '🇳🇴', q: 'Чей это флаг?', answer: 'Норвегия', options: ['Норвегия', 'Швеция', 'Финляндия', 'Исландия'], hint: 'Красный флаг с синим крестом', fact: 'Норвегия знаменита своими фьордами.', cat: 'Флаги' },
-  { flag: '🧊', q: 'Какой материк самый холодный?', answer: 'Антарктида', options: ['Антарктида', 'Евразия', 'Северная Америка', 'Австралия'], hint: 'Почти полностью покрыт льдом', fact: 'В Антарктиде зафиксированы самые низкие температуры на Земле.', cat: 'Факты' },
-  { flag: '🇹🇷', q: 'Какова столица Турции?', answer: 'Анкара', options: ['Анкара', 'Стамбул', 'Измир', 'Анталья'], hint: 'Не самый крупный город страны', fact: 'Стамбул крупнейший, но столица именно Анкара.', cat: 'Столицы' },
-  { flag: '🇰🇷', q: 'Чей это флаг?', answer: 'Южная Корея', options: ['Южная Корея', 'Япония', 'Китай', 'Сингапур'], hint: 'На белом фоне круг инь-ян', fact: 'Флаг Южной Кореи называется Тхэгыкки.', cat: 'Флаги' },
-  { flag: '🏝️', q: 'Какой остров самый большой в мире?', answer: 'Гренландия', options: ['Гренландия', 'Мадагаскар', 'Борнео', 'Новая Гвинея'], hint: 'Покрыт льдом', fact: 'Австралия считается континентом, поэтому не входит в этот список.', cat: 'Факты' },
-  { flag: '🇹🇭', q: 'Какова столица Таиланда?', answer: 'Бангкок', options: ['Бангкок', 'Пхукет', 'Чиангмай', 'Паттайя'], hint: 'Самый крупный город страны', fact: 'Полное церемониальное название Бангкока очень длинное.', cat: 'Столицы' },
-  { flag: '🇺🇦', q: 'Чей это флаг?', answer: 'Украина', options: ['Украина', 'Швеция', 'Казахстан', 'Румыния'], hint: 'Сине-жёлтые полосы', fact: 'Цвета часто связывают с небом и пшеничными полями.', cat: 'Флаги' },
-  { flag: '🌎', q: 'Какой материк самый маленький?', answer: 'Австралия', options: ['Австралия', 'Антарктида', 'Европа', 'Южная Америка'], hint: 'Материк и страна с одним названием', fact: 'Австралия — самый маленький материк по площади.', cat: 'Факты' },
-  { flag: '🇺🇸', q: 'Какова столица США?', answer: 'Вашингтон', options: ['Вашингтон', 'Нью-Йорк', 'Лос-Анджелес', 'Чикаго'], hint: 'Округ Колумбия', fact: 'Столица США не входит ни в один штат.', cat: 'Столицы' },
-  { flag: '🇨🇭', q: 'Чей это флаг?', answer: 'Швейцария', options: ['Швейцария', 'Дания', 'Англия', 'Австрия'], hint: 'Красный квадрат с белым крестом', fact: 'Флаг Швейцарии имеет необычную квадратную форму.', cat: 'Флаги' },
-  { flag: '🌲', q: 'Какое озеро самое глубокое в мире?', answer: 'Байкал', options: ['Байкал', 'Виктория', 'Каспийское море', 'Титикака'], hint: 'Находится в Сибири', fact: 'Байкал содержит около 20% незамёрзшей пресной воды планеты.', cat: 'Факты' },
-  { flag: '🇵🇹', q: 'Какова столица Португалии?', answer: 'Лиссабон', options: ['Лиссабон', 'Порту', 'Брага', 'Фару'], hint: 'Город у Атлантики', fact: 'Лиссабон — одна из старейших столиц Европы.', cat: 'Столицы' },
-  { flag: '🇫🇮', q: 'Чей это флаг?', answer: 'Финляндия', options: ['Финляндия', 'Швеция', 'Норвегия', 'Исландия'], hint: 'Белый флаг с синим крестом', fact: 'Финляндию называют страной тысяч озёр.', cat: 'Флаги' },
-  { flag: '🏞️', q: 'Какая река самая длинная в мире?', answer: 'Нил', options: ['Нил', 'Амазонка', 'Миссисипи', 'Янцзы'], hint: 'Течёт через северо-восток Африки', fact: 'Споры о самой длинной реке мира до сих пор продолжаются.', cat: 'Факты' },
-  { flag: '🇳🇱', q: 'Какова столица Нидерландов?', answer: 'Амстердам', options: ['Амстердам', 'Роттердам', 'Гаага', 'Утрехт'], hint: 'Город каналов', fact: 'Правительство Нидерландов работает в Гааге, но столица — Амстердам.', cat: 'Столицы' },
-  { flag: '🇬🇷', q: 'Чей это флаг?', answer: 'Греция', options: ['Греция', 'Израиль', 'Финляндия', 'Уругвай'], hint: 'Сине-белые полосы и крест', fact: 'Девять полос символизируют слоги национального девиза.', cat: 'Флаги' },
-  { flag: '🦘', q: 'На каком материке живут кенгуру в дикой природе?', answer: 'Австралия', options: ['Австралия', 'Африка', 'Южная Америка', 'Азия'], hint: 'Самый маленький материк', fact: 'Кенгуру считаются одним из символов Австралии.', cat: 'Факты' },
-  { flag: '🇸🇪', q: 'Какова столица Швеции?', answer: 'Стокгольм', options: ['Стокгольм', 'Гётеборг', 'Мальмё', 'Уппсала'], hint: 'Расположен на островах', fact: 'Стокгольм часто называют северной Венецией.', cat: 'Столицы' },
-  { flag: '🇦🇹', q: 'Чей это флаг?', answer: 'Австрия', options: ['Австрия', 'Латвия', 'Польша', 'Индонезия'], hint: 'Красно-бело-красные полосы', fact: 'Флаг Австрии считается одним из старейших в мире.', cat: 'Флаги' },
-  { flag: '🌴', q: 'Какой океан омывает Мадагаскар с востока?', answer: 'Индийский', options: ['Индийский', 'Атлантический', 'Тихий', 'Южный'], hint: 'Между Африкой и Австралией', fact: 'Мадагаскар расположен в западной части Индийского океана.', cat: 'Факты' },
-  { flag: '🇲🇦', q: 'Какова столица Марокко?', answer: 'Рабат', options: ['Рабат', 'Касабланка', 'Марракеш', 'Фес'], hint: 'Не самый известный туристический город страны', fact: 'Касабланка крупнее, но столица Марокко — Рабат.', cat: 'Столицы' },
-  { flag: '🇩🇰', q: 'Чей это флаг?', answer: 'Дания', options: ['Дания', 'Норвегия', 'Швейцария', 'Австрия'], hint: 'Красный фон и белый крест', fact: 'Даннеброг считается одним из старейших государственных флагов.', cat: 'Флаги' },
-  { flag: '🏔️', q: 'В какой горной системе находится Монблан?', answer: 'Альпы', options: ['Альпы', 'Гималаи', 'Анды', 'Кавказ'], hint: 'Граница Франции и Италии', fact: 'Монблан — одна из самых известных вершин Европы.', cat: 'Факты' },
-  { flag: '🇨🇺', q: 'Какова столица Кубы?', answer: 'Гавана', options: ['Гавана', 'Сантьяго-де-Куба', 'Варадеро', 'Тринидад'], hint: 'Крупнейший город острова', fact: 'Гавана известна колониальной архитектурой и набережной Малекон.', cat: 'Столицы' },
-  { flag: '🇮🇩', q: 'Чей это флаг?', answer: 'Индонезия', options: ['Индонезия', 'Польша', 'Монако', 'Сингапур'], hint: 'Две горизонтальные полосы: красная и белая', fact: 'У Монако похожий флаг, но другие пропорции.', cat: 'Флаги' },
-  { flag: '🌉', q: 'Через какой пролив проходит граница между Европой и Азией в Стамбуле?', answer: 'Босфор', options: ['Босфор', 'Дарданеллы', 'Гибралтар', 'Ла-Манш'], hint: 'Разделяет европейскую и азиатскую части города', fact: 'Босфор соединяет Чёрное море с Мраморным.', cat: 'Факты' },
-  { flag: '🇳🇿', q: 'Какова столица Новой Зеландии?', answer: 'Веллингтон', options: ['Веллингтон', 'Окленд', 'Крайстчерч', 'Данидин'], hint: 'Не самый большой город страны', fact: 'Окленд больше, но столица Новой Зеландии — Веллингтон.', cat: 'Столицы' },
-  { flag: '🇸🇬', q: 'Чей это флаг?', answer: 'Сингапур', options: ['Сингапур', 'Индонезия', 'Монако', 'Польша'], hint: 'Красно-белый флаг с полумесяцем и звёздами', fact: 'Пять звёзд на флаге символизируют идеалы государства.', cat: 'Флаги' },
-  { flag: '🗺️', q: 'Какая страна не имеет выхода к морю?', answer: 'Монголия', options: ['Монголия', 'Япония', 'Норвегия', 'Испания'], hint: 'Находится между Россией и Китаем', fact: 'Монголия — одна из крупнейших стран без выхода к морю.', cat: 'Факты' }
-];
-
-const AVATARS = ['#7c6cfa', '#f59e0b', '#22c55e', '#ef4444', '#06b6d4'];
-
-let myId = null;
-let myName = '';
-let roomCode = '';
-let roomRef = null;
-let amHost = false;
-let gameQuestions = [];
-let currentQIdx = 0;
-let myScore = 0;
-let answered = false;
-let playersData = {};
-let unsubRoom = null;
-
-function uid() {
-  return Math.random().toString(36).slice(2, 10);
-}
-
-function randomCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  return Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-}
-
-function shuffleArray(items) {
-  const arr = [...items];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-function buildGameQuestions() {
-  return shuffleArray(QUESTIONS)
-    .slice(0, QUESTIONS_PER_GAME)
-    .map((question) => ({
-      ...question,
-      options: shuffleArray(question.options)
-    }));
-}
-
-function show(id) {
-  document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
-  document.getElementById('screen-' + id).classList.add('active');
-}
-
-async function createRoom() {
-  const name = document.getElementById('input-name').value.trim();
-  if (!name) {
-    alert('Введи имя');
-    return;
-  }
-
-  myName = name;
-  myId = uid();
-  amHost = true;
-  roomCode = randomCode();
-  gameQuestions = buildGameQuestions();
-
-  roomRef = db.ref('rooms/' + roomCode);
-  await roomRef.set({
-    host: myId,
-    status: 'lobby',
-    questions: gameQuestions,
-    players: {
-      [myId]: { name: myName, score: 0, color: AVATARS[0], ready: false, currentQ: -1 }
-    }
-  });
-
-  roomRef.child('players/' + myId).onDisconnect().remove();
-
-  listenRoom();
-  show('lobby');
-  document.getElementById('lobby-code').textContent = roomCode;
-}
-
-async function joinRoom() {
-  const name = document.getElementById('input-name').value.trim();
-  const code = document.getElementById('input-code').value.trim().toUpperCase();
-  const errEl = document.getElementById('join-error');
-  errEl.textContent = '';
-
-  if (!name) {
-    errEl.textContent = 'Введи имя';
-    return;
-  }
-  if (code.length !== 4) {
-    errEl.textContent = 'Код — 4 буквы';
-    return;
-  }
-
-  const snap = await db.ref('rooms/' + code).get();
-  if (!snap.exists()) {
-    errEl.textContent = 'Комната не найдена';
-    return;
-  }
-
-  const data = snap.val();
-  if (data.status !== 'lobby') {
-    errEl.textContent = 'Игра уже началась';
-    return;
-  }
-
-  const playerCount = Object.keys(data.players || {}).length;
-  if (playerCount >= 4) {
-    errEl.textContent = 'Комната заполнена (макс. 4)';
-    return;
-  }
-
-  myName = name;
-  myId = uid();
-  amHost = false;
-  roomCode = code;
-  gameQuestions = data.questions || [];
-
-  roomRef = db.ref('rooms/' + code);
-  const colorIdx = playerCount % AVATARS.length;
-  await roomRef.child('players/' + myId).set({ name: myName, score: 0, color: AVATARS[colorIdx], ready: false, currentQ: -1 });
-  roomRef.child('players/' + myId).onDisconnect().remove();
-
-  listenRoom();
-  show('lobby');
-  document.getElementById('lobby-code').textContent = code;
-}
-
-function listenRoom() {
-  if (unsubRoom) {
-    roomRef.off('value', unsubRoom);
-  }
-
-  unsubRoom = roomRef.on('value', (snap) => {
-    if (!snap.exists()) {
-      goHome();
-      return;
-    }
-
-    const data = snap.val();
-    playersData = data.players || {};
-    gameQuestions = data.questions || gameQuestions;
-
-    if (data.status === 'lobby') {
-      renderLobby(data);
-    } else if (data.status === 'playing') {
-      if (document.getElementById('screen-quiz').classList.contains('active')) {
-        renderScores();
-        checkOpponentStatus();
-        checkAllAnswered(data);
-      } else {
-        currentQIdx = 0;
-        myScore = 0;
-        answered = false;
-        show('quiz');
-        renderQuestion();
-      }
-    } else if (data.status === 'finished') {
-      renderResults(data);
-    }
-  });
-}
-
-function renderLobby(data) {
-  const players = Object.entries(data.players || {});
-  const container = document.getElementById('lobby-players');
-  container.innerHTML = '';
-
-  players.forEach(([id, p]) => {
-    const div = document.createElement('div');
-    div.className = 'player-slot';
-    const isMe = id === myId;
-    div.innerHTML = `
-      <div class="avatar" style="background:${p.color}">${p.name[0].toUpperCase()}</div>
-      <span style="font-weight:600">${p.name}${isMe ? ' (ты)' : ''}</span>
-      <div class="status-dot"></div>`;
-    container.appendChild(div);
-  });
-
-  for (let i = players.length; i < 4; i++) {
-    const div = document.createElement('div');
-    div.className = 'player-slot waiting';
-    div.innerHTML = `<div class="avatar"></div><span style="color:var(--muted)">Ждём игрока...</span>`;
-    container.appendChild(div);
-  }
-
-  const startBtn = document.getElementById('btn-start');
-  if (amHost && players.length >= 2) {
-    startBtn.disabled = false;
-    startBtn.textContent = `Начать игру (${players.length} игрока)`;
-  } else if (amHost) {
-    startBtn.disabled = true;
-    startBtn.textContent = 'Нужен хотя бы 1 друг';
-  } else {
-    startBtn.disabled = true;
-    startBtn.textContent = 'Ждём хоста...';
-  }
-}
-
-async function startGame() {
-  if (!amHost) return;
-  await roomRef.update({ status: 'playing', currentQ: 0 });
-}
-
-function leaveRoom() {
-  if (roomRef) roomRef.child('players/' + myId).remove();
-  if (unsubRoom && roomRef) roomRef.off('value', unsubRoom);
-  goHome();
-}
-
-function renderQuestion() {
-  const q = gameQuestions[currentQIdx];
-  answered = false;
-
-  document.getElementById('q-num').textContent = `Вопрос ${currentQIdx + 1} / ${gameQuestions.length}`;
-  document.getElementById('q-bar').style.width = (currentQIdx / gameQuestions.length * 100) + '%';
-  document.getElementById('q-cat').textContent = q.cat;
-  document.getElementById('q-flag').textContent = q.flag;
-  document.getElementById('q-text').textContent = q.q;
-  document.getElementById('q-hint').textContent = '💡 ' + q.hint;
-  document.getElementById('q-fb').className = 'feedback';
-  document.getElementById('opp-status').textContent = '';
-  document.getElementById('waiting-next').style.display = 'none';
-
-  renderScores();
-
-  const opts = document.getElementById('q-opts');
-  opts.innerHTML = '';
-  q.options.forEach((opt) => {
-    const btn = document.createElement('button');
-    btn.className = 'opt';
-    btn.textContent = opt;
-    btn.onclick = () => pickAnswer(opt, btn, q);
-    opts.appendChild(btn);
-  });
-}
-
-function renderScores() {
-  const el = document.getElementById('q-scores');
-  el.innerHTML = '';
-  Object.values(playersData).forEach((p) => {
-    const chip = document.createElement('div');
-    chip.className = 'score-chip';
-    chip.style.borderColor = p.color;
-    chip.style.color = p.color;
-    chip.textContent = `${p.name.split(' ')[0]} ${p.score}`;
-    el.appendChild(chip);
-  });
-}
-
-async function pickAnswer(opt, btn, q) {
-  if (answered) return;
-  answered = true;
-
-  document.querySelectorAll('.opt').forEach((b) => {
-    b.disabled = true;
-    if (b.textContent === q.answer) b.classList.add('correct');
-  });
-
-  const fb = document.getElementById('q-fb');
-  let gained = 0;
-  if (opt === q.answer) {
-    btn.classList.add('correct');
-    gained = 10;
-    myScore += gained;
-    fb.textContent = `✓ Верно! +${gained} очков. ${q.fact}`;
-    fb.className = 'feedback ok show';
-  } else {
-    btn.classList.add('wrong');
-    fb.textContent = `✗ Неверно. Правильный ответ: ${q.answer}. ${q.fact}`;
-    fb.className = 'feedback bad show';
-  }
-
-  await roomRef.child('players/' + myId).update({
-    score: myScore,
-    currentQ: currentQIdx
-  });
-
-  document.getElementById('waiting-next').style.display = 'block';
-}
-
-function checkOpponentStatus() {
-  const others = Object.entries(playersData).filter(([id]) => id !== myId);
-  if (!answered) return;
-
-  const answeredCount = others.filter(([, p]) => p.currentQ >= currentQIdx).length;
-  const el = document.getElementById('opp-status');
-  if (answeredCount === others.length) {
-    el.textContent = '';
-  } else {
-    el.textContent = `Ждём ответа: ${others.length - answeredCount} из ${others.length}`;
-    el.className = 'opp-status';
-  }
-}
-
-function checkAllAnswered(data) {
-  if (!answered) return;
-
-  const players = Object.values(data.players || {});
-  const allAnswered = players.every((p) => p.currentQ >= currentQIdx);
-  if (!allAnswered) return;
-
-  if (currentQIdx + 1 >= gameQuestions.length) {
-    if (amHost) roomRef.update({ status: 'finished' });
-    return;
-  }
-
-  currentQIdx++;
-  renderQuestion();
-}
-
-function renderResults(data) {
-  show('results');
-  const sorted = Object.values(data.players || {}).sort((a, b) => b.score - a.score);
-  const medals = ['🥇', '🥈', '🥉', '4️⃣'];
-  const me = data.players[myId];
-  const winner = sorted[0];
-  const iWon = winner && me && winner.score === me.score && winner.name === me.name;
-  const tie = sorted.filter((p) => p.score === winner.score).length > 1;
-
-  document.getElementById('res-trophy').textContent = iWon ? '🏆' : (tie ? '🤝' : '😤');
-  document.getElementById('res-headline').textContent = tie ? 'Ничья!' : (iWon ? 'Ты победил!' : `Победил ${winner.name}!`);
-  document.getElementById('res-sub').textContent = `${sorted.length} игрока · ${gameQuestions.length} вопросов`;
-
-  const sb = document.getElementById('scoreboard');
-  sb.innerHTML = '';
-  sorted.forEach((p, i) => {
-    const row = document.createElement('div');
-    row.className = 'sb-row' + (i === 0 ? ' top' : '');
-    row.innerHTML = `
-      <div class="sb-rank">${medals[i]}</div>
-      <div class="avatar" style="background:${p.color};width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0">${p.name[0].toUpperCase()}</div>
-      <div class="sb-info">
-        <div class="sb-name">${p.name}</div>
-        <div class="sb-detail">${p.score} очков</div>
+  <div id="app">
+    <div class="topbar">
+      <div class="language-switch" id="language-switch">
+        <button type="button" class="lang-btn" data-lang="ru">RU</button>
+        <button type="button" class="lang-btn" data-lang="en">EN</button>
       </div>
-      <div class="sb-pts">${p.score}</div>`;
-    sb.appendChild(row);
-  });
-}
+    </div>
 
-async function playAgain() {
-  if (amHost) {
-    const newQs = buildGameQuestions();
-    const resetPlayers = {};
-    Object.entries(playersData).forEach(([id, p]) => {
-      resetPlayers[id] = { ...p, score: 0, currentQ: -1, ready: false };
-    });
-    await roomRef.update({ status: 'lobby', questions: newQs, players: resetPlayers });
-    gameQuestions = newQs;
-    currentQIdx = 0;
-    myScore = 0;
-    show('lobby');
-    document.getElementById('lobby-code').textContent = roomCode;
-  } else {
-    await roomRef.child('players/' + myId).update({ score: 0, currentQ: -1, ready: false });
-  }
-}
+    <div id="screen-home" class="screen active">
+      <div class="logo"><div class="logo-dot"></div>GeoQuiz Online</div>
+      <div class="home-title" id="home-title">Викторина<br>по географии</div>
+      <div class="home-sub" id="home-sub">Соревнуйся с другом в реальном времени — каждый со своего устройства.</div>
 
-function goHome() {
-  if (unsubRoom && roomRef) roomRef.off('value', unsubRoom);
-  roomRef = null;
-  unsubRoom = null;
-  show('home');
-}
-</script>
+      <div class="card">
+        <div class="card-title" id="name-card-title">Твой ник</div>
+        <input type="text" id="input-name" placeholder="Введи имя" maxlength="20">
+      </div>
+
+      <button class="btn btn-primary" id="btn-create-room" style="margin-bottom:8px">Создать комнату</button>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card-title" id="join-card-title">Войти по коду</div>
+        <input
+          type="text"
+          id="input-code"
+          placeholder="Код комнаты (4 буквы)"
+          maxlength="4"
+          style="text-transform:uppercase;letter-spacing:0.15em;font-family:'Unbounded',sans-serif;font-size:18px"
+        >
+        <div class="error-msg" id="join-error"></div>
+        <button class="btn btn-outline" id="btn-join-room" style="margin-top:10px">Войти в комнату</button>
+      </div>
+    </div>
+
+    <div id="screen-lobby" class="screen">
+      <div class="logo"><div class="logo-dot"></div>GeoQuiz Online</div>
+      <div class="card-title" id="lobby-code-title" style="margin-bottom:8px">Код комнаты — поделись с другом:</div>
+      <div class="room-code-display" id="lobby-code"></div>
+      <div class="room-hint" id="lobby-hint">Жди, пока друг введёт этот код</div>
+
+      <div class="card">
+        <div class="card-title" id="match-settings-title">Параметры матча</div>
+        <div class="setting-block">
+          <div class="setting-label" id="mode-label">Режим игры</div>
+          <div class="chip-grid" id="mode-options"></div>
+        </div>
+        <div class="setting-block">
+          <div class="setting-label" id="difficulty-label">Сложность</div>
+          <div class="chip-grid" id="difficulty-options"></div>
+        </div>
+        <div class="setting-summary" id="settings-summary"></div>
+      </div>
+
+      <div class="players-in-room" id="lobby-players"></div>
+
+      <button class="btn btn-primary" id="btn-start" disabled>Начать игру</button>
+      <button class="btn btn-outline" id="btn-leave-room">Выйти</button>
+    </div>
+
+    <div id="screen-quiz" class="screen">
+      <div class="quiz-meta">
+        <div class="q-num" id="q-num">Вопрос 1 / 10</div>
+        <div class="quiz-right-meta">
+          <div class="timer-pill" id="timer-pill">15s</div>
+          <div class="q-scores" id="q-scores"></div>
+        </div>
+      </div>
+      <div class="progress-track"><div class="progress-bar" id="q-bar" style="width:0%"></div></div>
+      <div class="timer-track"><div class="timer-bar" id="timer-bar" style="width:100%"></div></div>
+
+      <div class="cat-line">
+        <div class="cat-tag" id="q-cat"></div>
+        <div class="mode-badge" id="q-mode"></div>
+      </div>
+      <div class="q-flag" id="q-flag"></div>
+      <div class="q-text" id="q-text"></div>
+      <div class="q-hint" id="q-hint"></div>
+
+      <div class="options" id="q-opts"></div>
+      <div class="feedback" id="q-fb"></div>
+      <div class="leader-line" id="leader-line"></div>
+      <div class="opp-status" id="opp-status"></div>
+
+      <div class="waiting-next" id="waiting-next" style="display:none">
+        <div id="waiting-text" style="font-size:13px;color:var(--muted)">Ждём остальных игроков...</div>
+        <div class="waiting-dots"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+
+    <div id="screen-results" class="screen">
+      <div class="result-hero">
+        <div class="result-trophy" id="res-trophy"></div>
+        <div class="result-headline" id="res-headline"></div>
+        <div class="result-sub" id="res-sub"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" id="result-settings-title">Параметры матча</div>
+        <div class="setting-summary" id="result-settings-summary"></div>
+      </div>
+      <div class="scoreboard" id="scoreboard"></div>
+      <button class="btn btn-primary" id="btn-play-again">Сыграть ещё раз</button>
+      <button class="btn btn-outline" id="btn-go-home">На главную</button>
+    </div>
+  </div>
+
+  <script type="module" src="./js/app.js"></script>
 </body>
 </html>
