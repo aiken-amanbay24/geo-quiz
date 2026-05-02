@@ -65,6 +65,8 @@ const els = {
   resTrophy: document.getElementById("res-trophy"),
   resHeadline: document.getElementById("res-headline"),
   resSub: document.getElementById("res-sub"),
+  championCard: document.getElementById("champion-card"),
+  leaderboardTitle: document.getElementById("leaderboard-title"),
   scoreboard: document.getElementById("scoreboard")
 };
 
@@ -164,6 +166,7 @@ function renderStaticText() {
   document.getElementById("powerups-title").textContent = t().powerupsTitle;
   document.getElementById("waiting-text").textContent = t().waitingPlayers;
   document.getElementById("result-settings-title").textContent = t().resultSettingsTitle;
+  els.leaderboardTitle.textContent = t().leaderboardTitle;
   document.getElementById("btn-play-again").textContent = t().playAgain;
   document.getElementById("btn-go-home").textContent = t().goHome;
 }
@@ -797,17 +800,28 @@ function renderResults(data) {
   els.resTrophy.textContent = tie ? "🤝" : (iWon ? "🏆" : "😤");
   els.resHeadline.textContent = tie ? t().resultTie : (iWon ? t().resultWinYou : t().resultWinOther(winner.name));
   els.resSub.textContent = t().resultPlayersQuestions(sorted.length, gameQuestions.length);
+  els.leaderboardTitle.textContent = t().leaderboardTitle;
+
+  const winnerAccuracy = gameQuestions.length ? Math.round(((winner.correct || 0) / gameQuestions.length) * 100) : 0;
+  els.championCard.innerHTML = `
+    <div class="champion-place">${t().placeLabel(1)}</div>
+    <div class="champion-avatar" style="background:${winner.color}">${winner.avatar || "🌍"}</div>
+    <div class="champion-name">${winner.name}</div>
+    <div class="champion-score">${t().championScore(winner.score, winner.correct || 0, winnerAccuracy)}</div>
+  `;
 
   els.scoreboard.innerHTML = "";
-  sorted.forEach((player, index) => {
+  sorted.slice(1).forEach((player, index) => {
+    const place = index + 2;
     const accuracy = gameQuestions.length ? Math.round(((player.correct || 0) / gameQuestions.length) * 100) : 0;
     const row = document.createElement("div");
-    row.className = `sb-row${index === 0 ? " top" : ""}`;
+    row.className = "sb-row";
     row.innerHTML = `
-      <div class="sb-rank">${medals[index] || "•"}</div>
+      <div class="sb-rank">${medals[place - 1] || "•"}</div>
       <div class="avatar" style="background:${player.color}">${player.avatar || "🌍"}</div>
       <div class="sb-info">
         <div class="sb-name">${player.name}</div>
+        <div class="sb-place">${t().placeLabel(place)}</div>
         <div class="sb-detail">${t().scoreDetail(player.score, player.correct || 0, accuracy)}</div>
       </div>
       <div class="sb-pts">${player.score}</div>
