@@ -594,6 +594,11 @@ input[type="text"]::placeholder { color: var(--muted); }
   padding: 1.25rem;
   border-color: rgba(245,158,11,0.35);
   background: linear-gradient(180deg, rgba(245,158,11,0.08), rgba(255,255,255,0.02));
+  color: var(--text);
+}
+
+.champion-card:empty {
+  display: none;
 }
 
 .champion-place {
@@ -615,6 +620,7 @@ input[type="text"]::placeholder { color: var(--muted); }
   justify-content: center;
   font-size: 30px;
   color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
 }
 
 .champion-name {
