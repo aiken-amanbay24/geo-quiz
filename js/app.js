@@ -612,7 +612,7 @@ function renderLeaderLine() {
   if (diff >= 20) {
     els.leaderLine.textContent = t().leaderFire(leader.name);
   } else if (diff > 0) {
-    els.leaderLine.textContent = t().leaderClose(second.name, diff);
+    els.leaderLine.textContent = t().leaderClose(leader.name, second.name, diff);
   } else {
     els.leaderLine.textContent = t().leaderTie;
   }
@@ -791,6 +791,11 @@ function renderResults(data) {
   show("results");
 
   const sorted = Object.values(data.players || {}).sort((a, b) => b.score - a.score);
+  if (!sorted.length) {
+    els.championCard.innerHTML = "";
+    els.scoreboard.innerHTML = "";
+    return;
+  }
   const medals = ["🥇", "🥈", "🥉", "4️⃣"];
   const me = data.players?.[myId];
   const winner = sorted[0];
