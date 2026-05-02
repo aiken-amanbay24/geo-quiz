@@ -1,4 +1,4 @@
-import { db } from "./firebase-config.js";
+import { db } from "./firebase-config.js?v=20260502-2248";
 import {
   AVATARS,
   PLAYER_COLORS,
@@ -8,13 +8,13 @@ import {
   QUESTION_TIME_SECONDS,
   buildGameQuestions,
   getQuestionBankStats
-} from "./question-bank.js";
+} from "./question-bank.js?v=20260502-2248";
 import {
   UI_TEXT,
   DEFAULT_LANGUAGE,
   getStoredLanguage,
   storeLanguage
-} from "./translations.js";
+} from "./translations.js?v=20260502-2248";
 
 const DEFAULT_SETTINGS = {
   mode: "mixed",
