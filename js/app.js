@@ -612,7 +612,7 @@ function renderLeaderLine() {
   if (diff >= 20) {
     els.leaderLine.textContent = t().leaderFire(leader.name);
   } else if (diff > 0) {
-    els.leaderLine.textContent = t().leaderClose(leader.name, second.name, diff);
+    els.leaderLine.textContent = t().leaderAhead(leader.name, second.name, diff);
   } else {
     els.leaderLine.textContent = t().leaderTie;
   }
