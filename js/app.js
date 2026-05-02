@@ -807,26 +807,33 @@ function renderResults(data) {
   els.resSub.textContent = t().resultPlayersQuestions(sorted.length, gameQuestions.length);
   els.leaderboardTitle.textContent = t().leaderboardTitle;
 
-  const winnerAccuracy = gameQuestions.length ? Math.round(((winner.correct || 0) / gameQuestions.length) * 100) : 0;
-  els.championCard.innerHTML = `
-    <div class="champion-place">${t().placeLabel(1)}</div>
-    <div class="champion-avatar" style="background:${winner.color}">${winner.avatar || "🌍"}</div>
-    <div class="champion-name">${winner.name}</div>
-    <div class="champion-score">${t().championScore(winner.score, winner.correct || 0, winnerAccuracy)}</div>
-  `;
+  if (tie) {
+    els.championCard.innerHTML = "";
+  } else {
+    const winnerAccuracy = gameQuestions.length ? Math.round(((winner.correct || 0) / gameQuestions.length) * 100) : 0;
+    els.championCard.innerHTML = `
+      <div class="champion-place">${t().placeLabel(1)}</div>
+      <div class="champion-avatar" style="background:${winner.color}">${winner.avatar || "🌍"}</div>
+      <div class="champion-name">${winner.name}</div>
+      <div class="champion-score">${t().championScore(winner.score, winner.correct || 0, winnerAccuracy)}</div>
+    `;
+  }
 
   els.scoreboard.innerHTML = "";
-  sorted.slice(1).forEach((player, index) => {
-    const place = index + 2;
+  const scoreboardPlayers = tie ? sorted : sorted.slice(1);
+  scoreboardPlayers.forEach((player, index) => {
+    const place = tie ? index + 1 : index + 2;
     const accuracy = gameQuestions.length ? Math.round(((player.correct || 0) / gameQuestions.length) * 100) : 0;
     const row = document.createElement("div");
     row.className = "sb-row";
+    const placeMarkup = tie ? "" : `<div class="sb-place">${t().placeLabel(place)}</div>`;
+    const rankMarkup = tie ? "" : `<div class="sb-rank">${medals[place - 1] || "•"}</div>`;
     row.innerHTML = `
-      <div class="sb-rank">${medals[place - 1] || "•"}</div>
+      ${rankMarkup}
       <div class="avatar" style="background:${player.color}">${player.avatar || "🌍"}</div>
       <div class="sb-info">
         <div class="sb-name">${player.name}</div>
-        <div class="sb-place">${t().placeLabel(place)}</div>
+        ${placeMarkup}
         <div class="sb-detail">${t().scoreDetail(player.score, player.correct || 0, accuracy)}</div>
       </div>
       <div class="sb-pts">${player.score}</div>
