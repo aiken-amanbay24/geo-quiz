@@ -22,6 +22,18 @@ const DEFAULT_SETTINGS = {
   questionTime: QUESTION_TIME_SECONDS
 };
 
+const POWERUP_DEFS = [
+  { id: "fiftyFifty", icon: "✂️" },
+  { id: "doublePoints", icon: "✨" },
+  { id: "freezeTime", icon: "⏳" },
+  { id: "shield", icon: "🛡️" }
+];
+
+const TOTAL_POWERUP_USES = 3;
+const BASE_POINTS = 10;
+const WRONG_PENALTY = 5;
+const FREEZE_TIME_MS = 5000;
+
 const els = {
   nameInput: document.getElementById("input-name"),
   codeInput: document.getElementById("input-code"),
@@ -40,6 +52,8 @@ const els = {
   qFlag: document.getElementById("q-flag"),
   qText: document.getElementById("q-text"),
   qHint: document.getElementById("q-hint"),
+  powerupsGrid: document.getElementById("powerups-grid"),
+  powerupsLeft: document.getElementById("powerups-left"),
   qOpts: document.getElementById("q-opts"),
   qFb: document.getElementById("q-fb"),
   qScores: document.getElementById("q-scores"),
@@ -147,6 +161,7 @@ function renderStaticText() {
   document.getElementById("match-settings-title").textContent = t().matchSettingsTitle;
   document.getElementById("mode-label").textContent = t().modeLabel;
   document.getElementById("difficulty-label").textContent = t().difficultyLabel;
+  document.getElementById("powerups-title").textContent = t().powerupsTitle;
   document.getElementById("waiting-text").textContent = t().waitingPlayers;
   document.getElementById("result-settings-title").textContent = t().resultSettingsTitle;
   document.getElementById("btn-play-again").textContent = t().playAgain;
@@ -168,6 +183,62 @@ function getCategoryLabel(key) {
 function getLocalizedText(value) {
   if (typeof value === "string") return value;
   return value?.[currentLanguage] || value?.[DEFAULT_LANGUAGE] || "";
+}
+
+function createInitialPowerupState() {
+  return {
+    usesLeft: TOTAL_POWERUP_USES,
+    used: {
+      fiftyFifty: false,
+      doublePoints: false,
+      freezeTime: false,
+      shield: false
+    },
+    active: {
+      doublePoints: false,
+      shield: false
+    },
+    extraTimeMs: 0
+  };
+}
+
+function normalizePowerupState(player) {
+  return {
+    ...createInitialPowerupState(),
+    ...(player?.powerups || {}),
+    used: {
+      ...createInitialPowerupState().used,
+      ...(player?.powerups?.used || {})
+    },
+    active: {
+      ...createInitialPowerupState().active,
+      ...(player?.powerups?.active || {})
+    }
+  };
+}
+
+function getMyPlayer() {
+  return playersData[myId] || null;
+}
+
+function getMyPowerups() {
+  return normalizePowerupState(getMyPlayer());
+}
+
+function getPlayerRemainingMs(player) {
+  const baseMs = (roomState?.settings?.questionTime || QUESTION_TIME_SECONDS) * 1000;
+  const startedAt = roomState?.questionStartedAt || Date.now();
+  const extraTimeMs = normalizePowerupState(player).extraTimeMs || 0;
+  return Math.max(0, baseMs + extraTimeMs - (Date.now() - startedAt));
+}
+
+function getPowerupButtonDisabled(id, powerups) {
+  if (answered) return true;
+  if (!roomState || roomState.status !== "playing") return true;
+  if ((powerups.usesLeft || 0) <= 0) return true;
+  if (powerups.used[id]) return true;
+  if (id === "freezeTime" && getRemainingMs() === 0) return true;
+  return false;
 }
 
 function getSettingsSummary(settings) {
@@ -265,6 +336,8 @@ async function createRoom() {
         avatar: randomAvatar(),
         currentQ: -1,
         correct: 0
+        ,
+        powerups: createInitialPowerupState()
       }
     }
   });
@@ -320,6 +393,8 @@ async function joinRoom() {
     avatar: randomAvatar(),
     currentQ: -1,
     correct: 0
+    ,
+    powerups: createInitialPowerupState()
   });
 
   roomRef.child(`players/${myId}`).onDisconnect().remove();
@@ -413,6 +488,8 @@ async function startGame() {
       score: 0,
       currentQ: -1,
       correct: 0
+      ,
+      powerups: createInitialPowerupState()
     };
   });
 
@@ -441,6 +518,7 @@ function handlePlayingState(data) {
 
   myScore = playersData[myId]?.score || 0;
   renderScores();
+  renderPowerups();
   renderLeaderLine();
   checkOpponentStatus();
   updateTimerUi();
@@ -467,6 +545,7 @@ function renderQuestion() {
   els.oppStatus.textContent = "";
   els.waitingNext.style.display = "none";
   els.qOpts.innerHTML = "";
+  renderPowerups();
 
   question.optionOrder.forEach((optionId) => {
     const button = document.createElement("button");
@@ -476,6 +555,27 @@ function renderQuestion() {
     button.dataset.optionId = optionId;
     button.addEventListener("click", () => submitAnswer(optionId));
     els.qOpts.appendChild(button);
+  });
+}
+
+function renderPowerups() {
+  const powerups = getMyPowerups();
+  els.powerupsLeft.textContent = t().powerupsLeft(powerups.usesLeft || 0);
+  els.powerupsGrid.innerHTML = "";
+
+  POWERUP_DEFS.forEach((def) => {
+    const button = document.createElement("button");
+    const isActive = def.id !== "fiftyFifty" && powerups.active?.[def.id];
+    const isUsed = !!powerups.used?.[def.id];
+    button.type = "button";
+    button.className = `powerup-btn${isActive ? " active" : ""}${isUsed ? " used" : ""}`;
+    button.disabled = getPowerupButtonDisabled(def.id, powerups);
+    button.innerHTML = `
+      <span class="powerup-label">${def.icon} ${t().powerups[def.id]}</span>
+      <span class="powerup-desc">${isUsed ? t().powerupUsed : t().powerupDescriptions[def.id]}</span>
+    `;
+    button.addEventListener("click", () => activatePowerup(def.id));
+    els.powerupsGrid.appendChild(button);
   });
 }
 
@@ -527,6 +627,9 @@ async function submitAnswer(selectedOptionId, isTimeout = false) {
   const correct = selectedOptionId === question.answerId;
   let gained = 0;
   const currentPlayer = playersData[myId] || {};
+  const powerups = normalizePowerupState(currentPlayer);
+  const hadDoublePoints = !!powerups.active.doublePoints;
+  const hadShield = !!powerups.active.shield;
 
   document.querySelectorAll(".opt").forEach((button) => {
     button.disabled = true;
@@ -538,33 +641,57 @@ async function submitAnswer(selectedOptionId, isTimeout = false) {
   });
 
   const localizedAnswer = getLocalizedText(question.options[question.answerId]);
+  let feedbackSuffix = "";
 
   if (correct) {
-    gained = 10;
+    gained = hadDoublePoints ? BASE_POINTS * 2 : BASE_POINTS;
     myScore += gained;
     els.qFb.textContent = t().correct(gained, getLocalizedText(question.fact));
     els.qFb.className = "feedback ok show";
+    if (hadDoublePoints) {
+      feedbackSuffix = ` ${t().bonusActivated.doublePoints}`;
+    }
   } else if (isTimeout) {
+    if (!hadShield) {
+      myScore -= WRONG_PENALTY;
+      feedbackSuffix = ` ${t().penaltyNotice(WRONG_PENALTY)}`;
+    } else {
+      feedbackSuffix = ` ${t().shieldSaved}`;
+    }
     els.qFb.textContent = t().timeout(localizedAnswer, getLocalizedText(question.fact));
     els.qFb.className = "feedback bad show";
   } else {
+    if (!hadShield) {
+      myScore -= WRONG_PENALTY;
+      feedbackSuffix = ` ${t().penaltyNotice(WRONG_PENALTY)}`;
+    } else {
+      feedbackSuffix = ` ${t().shieldSaved}`;
+    }
     els.qFb.textContent = t().wrong(localizedAnswer, getLocalizedText(question.fact));
     els.qFb.className = "feedback bad show";
   }
+  els.qFb.textContent += feedbackSuffix;
 
   await roomRef.child(`players/${myId}`).update({
     score: myScore,
     currentQ: currentQIdx,
-    correct: (currentPlayer.correct || 0) + (correct ? 1 : 0)
+    correct: (currentPlayer.correct || 0) + (correct ? 1 : 0),
+    powerups: {
+      ...powerups,
+      active: {
+        ...powerups.active,
+        doublePoints: false,
+        shield: false
+      }
+    }
   });
 
   els.waitingNext.style.display = "block";
+  renderPowerups();
 }
 
 function getRemainingMs() {
-  if (!roomState?.questionStartedAt) return (roomState?.settings?.questionTime || QUESTION_TIME_SECONDS) * 1000;
-  const durationMs = (roomState?.settings?.questionTime || QUESTION_TIME_SECONDS) * 1000;
-  return Math.max(0, durationMs - (Date.now() - roomState.questionStartedAt));
+  return getPlayerRemainingMs(getMyPlayer());
 }
 
 function updateTimerUi() {
@@ -621,10 +748,10 @@ async function maybeAdvanceGame(data) {
   const questionIndex = data.currentQ || 0;
   const players = Object.values(data.players || {});
   const allAnswered = players.every((player) => player.currentQ >= questionIndex);
-  const expired = getRemainingMs() === 0;
+  const allExpired = players.every((player) => getPlayerRemainingMs(player) === 0 || player.currentQ >= questionIndex);
   const advanceKey = `${data.status}:${questionIndex}:${data.questionStartedAt}`;
 
-  if ((!allAnswered && !expired) || advancingKey === advanceKey) return;
+  if ((!allAnswered && !allExpired) || advancingKey === advanceKey) return;
   advancingKey = advanceKey;
 
   if (questionIndex + 1 >= (data.questions || []).length) {
@@ -634,7 +761,24 @@ async function maybeAdvanceGame(data) {
 
   await roomRef.update({
     currentQ: questionIndex + 1,
-    questionStartedAt: Date.now()
+    questionStartedAt: Date.now(),
+    players: Object.fromEntries(
+      Object.entries(playersData).map(([id, player]) => [
+        id,
+        {
+          ...player,
+          powerups: {
+            ...normalizePowerupState(player),
+            extraTimeMs: 0,
+            active: {
+              ...normalizePowerupState(player).active,
+              doublePoints: false,
+              shield: false
+            }
+          }
+        }
+      ])
+    )
   });
 }
 
@@ -683,9 +827,19 @@ async function playAgain() {
         ...player,
         score: 0,
         currentQ: -1,
-        correct: 0
-      };
-    });
+      correct: 0
+      ,
+      powerups: {
+        ...normalizePowerupState(player),
+        extraTimeMs: 0,
+        active: {
+          ...normalizePowerupState(player).active,
+          doublePoints: false,
+          shield: false
+        }
+      }
+    };
+  });
 
     await roomRef.update({
       status: "lobby",
@@ -699,8 +853,73 @@ async function playAgain() {
       score: 0,
       currentQ: -1,
       correct: 0
+      ,
+      powerups: {
+        ...normalizePowerupState(playersData[myId]),
+        extraTimeMs: 0,
+        active: {
+          ...normalizePowerupState(playersData[myId]).active,
+          doublePoints: false,
+          shield: false
+        }
+      }
     });
   }
+}
+
+async function activatePowerup(id) {
+  if (!roomRef || answered || !roomState || roomState.status !== "playing") return;
+
+  const player = getMyPlayer();
+  const powerups = normalizePowerupState(player);
+  if (getPowerupButtonDisabled(id, powerups)) return;
+
+  const nextPowerups = {
+    ...powerups,
+    usesLeft: Math.max(0, (powerups.usesLeft || 0) - 1),
+    used: {
+      ...powerups.used,
+      [id]: true
+    },
+    active: {
+      ...powerups.active
+    }
+  };
+
+  if (id === "fiftyFifty") {
+    applyFiftyFifty();
+  } else if (id === "doublePoints") {
+    nextPowerups.active.doublePoints = true;
+  } else if (id === "freezeTime") {
+    nextPowerups.extraTimeMs = (nextPowerups.extraTimeMs || 0) + FREEZE_TIME_MS;
+  } else if (id === "shield") {
+    nextPowerups.active.shield = true;
+  }
+
+  await roomRef.child(`players/${myId}/powerups`).set(nextPowerups);
+  playersData[myId] = {
+    ...player,
+    powerups: nextPowerups
+  };
+  renderPowerups();
+
+  if (id !== "fiftyFifty") {
+    els.qFb.textContent = t().bonusActivated[id];
+    els.qFb.className = "feedback ok show";
+  }
+}
+
+function applyFiftyFifty() {
+  const question = gameQuestions[currentQIdx];
+  const wrongButtons = Array.from(document.querySelectorAll(".opt")).filter(
+    (button) => button.dataset.optionId !== question.answerId
+  );
+  wrongButtons.slice(0, 2).forEach((button) => {
+    button.disabled = true;
+    button.style.opacity = "0.35";
+  });
+  els.qFb.textContent = t().bonusActivated.fiftyFifty;
+  els.qFb.className = "feedback ok show";
 }
 
 function leaveRoom() {
