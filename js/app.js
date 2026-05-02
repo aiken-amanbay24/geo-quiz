@@ -570,9 +570,11 @@ function renderPowerups() {
     button.type = "button";
     button.className = `powerup-btn${isActive ? " active" : ""}${isUsed ? " used" : ""}`;
     button.disabled = getPowerupButtonDisabled(def.id, powerups);
+    button.setAttribute("aria-label", t().powerupDescriptions[def.id]);
     button.innerHTML = `
-      <span class="powerup-label">${def.icon} ${t().powerups[def.id]}</span>
-      <span class="powerup-desc">${isUsed ? t().powerupUsed : t().powerupDescriptions[def.id]}</span>
+      <span class="powerup-icon">${def.icon}</span>
+      <span class="powerup-label">${t().powerups[def.id]}</span>
+      <span class="powerup-tooltip${isUsed ? " is-used" : ""}">${isUsed ? t().powerupUsed : t().powerupDescriptions[def.id]}</span>
     `;
     button.addEventListener("click", () => activatePowerup(def.id));
     els.powerupsGrid.appendChild(button);
