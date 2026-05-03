@@ -1,4 +1,4 @@
-import { db } from "./firebase-config.js?v=20260502-2248";
+import { db } from "./firebase-config.js?v=20260503-0015";
 import {
   AVATARS,
   PLAYER_COLORS,
@@ -8,13 +8,13 @@ import {
   QUESTION_TIME_SECONDS,
   buildGameQuestions,
   getQuestionBankStats
-} from "./question-bank.js?v=20260502-2248";
+} from "./question-bank.js?v=20260503-0015";
 import {
   UI_TEXT,
   DEFAULT_LANGUAGE,
   getStoredLanguage,
   storeLanguage
-} from "./translations.js?v=20260502-2248";
+} from "./translations.js?v=20260503-0015";
 
 const DEFAULT_SETTINGS = {
   mode: "mixed",
@@ -33,6 +33,9 @@ const TOTAL_POWERUP_USES = 3;
 const BASE_POINTS = 10;
 const WRONG_PENALTY = 5;
 const FREEZE_TIME_MS = 5000;
+const BOT_ID = "bot-opponent";
+const BOT_THINK_MIN_MS = 1800;
+const BOT_THINK_MAX_MS = 6200;
 
 const els = {
   nameInput: document.getElementById("input-name"),
@@ -86,8 +89,11 @@ let myScore = 0;
 let timerInterval = null;
 let roomListener = null;
 let advancingKey = null;
+let botAnswerTimeout = null;
+let botAnswerKey = null;
 
 document.getElementById("btn-create-room").addEventListener("click", createRoom);
+document.getElementById("btn-play-bot").addEventListener("click", createBotRoom);
 document.getElementById("btn-join-room").addEventListener("click", joinRoom);
 document.getElementById("btn-start").addEventListener("click", startGame);
 document.getElementById("btn-leave-room").addEventListener("click", leaveRoom);
@@ -115,6 +121,28 @@ function randomCode() {
 
 function randomAvatar() {
   return AVATARS[Math.floor(Math.random() * AVATARS.length)];
+}
+
+function createPlayerRecord({ name, color, avatar, bot = false }) {
+  return {
+    name,
+    score: 0,
+    color,
+    avatar,
+    currentQ: -1,
+    correct: 0,
+    bot,
+    powerups: createInitialPowerupState()
+  };
+}
+
+function createBotPlayerRecord() {
+  return createPlayerRecord({
+    name: t().botName,
+    color: PLAYER_COLORS[1],
+    avatar: "🤖",
+    bot: true
+  });
 }
 
 function show(id) {
@@ -154,6 +182,7 @@ function renderStaticText() {
   document.getElementById("name-card-title").textContent = t().nameCardTitle;
   els.nameInput.placeholder = t().namePlaceholder;
   document.getElementById("btn-create-room").textContent = t().createRoom;
+  document.getElementById("btn-play-bot").textContent = t().playWithBot;
   document.getElementById("join-card-title").textContent = t().joinCardTitle;
   els.codeInput.placeholder = t().codePlaceholder;
   document.getElementById("btn-join-room").textContent = t().joinRoom;
@@ -184,6 +213,11 @@ function getCategoryLabel(key) {
 function getLocalizedText(value) {
   if (typeof value === "string") return value;
   return value?.[currentLanguage] || value?.[DEFAULT_LANGUAGE] || "";
+}
+
+function getDisplayPlayerName(player) {
+  if (player?.bot) return t().botName;
+  return player?.name || "";
 }
 
 function createInitialPowerupState() {
@@ -330,16 +364,47 @@ async function createRoom() {
     settings: { ...DEFAULT_SETTINGS },
     questions: [],
     players: {
-      [myId]: {
+      [myId]: createPlayerRecord({
         name: myName,
-        score: 0,
         color: PLAYER_COLORS[0],
-        avatar: randomAvatar(),
-        currentQ: -1,
-        correct: 0
-        ,
-        powerups: createInitialPowerupState()
-      }
+        avatar: randomAvatar()
+      })
+    }
+  });
+
+  roomRef.child(`players/${myId}`).onDisconnect().remove();
+  listenRoom();
+  show("lobby");
+  els.lobbyCode.textContent = roomCode;
+}
+
+async function createBotRoom() {
+  const name = els.nameInput.value.trim();
+  if (!name) {
+    alert(t().needName);
+    return;
+  }
+
+  myId = uid();
+  myName = name;
+  amHost = true;
+  roomCode = randomCode();
+  roomRef = db.ref(`rooms/${roomCode}`);
+
+  await roomRef.set({
+    host: myId,
+    status: "lobby",
+    currentQ: 0,
+    questionStartedAt: null,
+    settings: { ...DEFAULT_SETTINGS },
+    questions: [],
+    players: {
+      [myId]: createPlayerRecord({
+        name: myName,
+        color: PLAYER_COLORS[0],
+        avatar: randomAvatar()
+      }),
+      [BOT_ID]: createBotPlayerRecord()
     }
   });
 
@@ -387,16 +452,13 @@ async function joinRoom() {
   roomCode = code;
   roomRef = db.ref(`rooms/${code}`);
 
-  await roomRef.child(`players/${myId}`).set({
-    name: myName,
-    score: 0,
-    color: PLAYER_COLORS[playerCount % PLAYER_COLORS.length],
-    avatar: randomAvatar(),
-    currentQ: -1,
-    correct: 0
-    ,
-    powerups: createInitialPowerupState()
-  });
+  await roomRef.child(`players/${myId}`).set(
+    createPlayerRecord({
+      name: myName,
+      color: PLAYER_COLORS[playerCount % PLAYER_COLORS.length],
+      avatar: randomAvatar()
+    })
+  );
 
   roomRef.child(`players/${myId}`).onDisconnect().remove();
   listenRoom();
@@ -424,6 +486,7 @@ function listenRoom() {
     if (roomState.status === "lobby") {
       renderedQuestionIndex = -1;
       stopTimer();
+      clearBotAnswerSchedule();
       renderLobby(roomState);
       return;
     }
@@ -435,6 +498,7 @@ function listenRoom() {
 
     if (roomState.status === "finished") {
       stopTimer();
+      clearBotAnswerSchedule();
       renderResults(roomState);
     }
   });
@@ -449,7 +513,7 @@ function renderLobby(data) {
     row.className = "player-slot";
     row.innerHTML = `
       <div class="avatar" style="background:${player.color}">${player.avatar || "🌍"}</div>
-      <span style="font-weight:600">${player.name}${id === myId ? ` (${t().you})` : ""}</span>
+      <span style="font-weight:600">${getDisplayPlayerName(player)}${id === myId ? ` (${t().you})` : ""}</span>
       <div class="status-dot"></div>
     `;
     els.lobbyPlayers.appendChild(row);
@@ -526,8 +590,66 @@ function handlePlayingState(data) {
   startTimer();
 
   if (amHost) {
+    scheduleBotAnswer(data);
     maybeAdvanceGame(data);
   }
+}
+
+function clearBotAnswerSchedule() {
+  if (botAnswerTimeout) {
+    clearTimeout(botAnswerTimeout);
+    botAnswerTimeout = null;
+  }
+  botAnswerKey = null;
+}
+
+function getBotAccuracyByDifficulty(difficulty) {
+  if (difficulty === "easy") return 0.75;
+  if (difficulty === "medium") return 0.58;
+  if (difficulty === "hard") return 0.38;
+  return 0.56;
+}
+
+function getRandomBotDelay() {
+  return Math.floor(BOT_THINK_MIN_MS + Math.random() * (BOT_THINK_MAX_MS - BOT_THINK_MIN_MS));
+}
+
+function scheduleBotAnswer(data) {
+  const botPlayer = data.players?.[BOT_ID];
+  if (!botPlayer || botPlayer.currentQ >= currentQIdx) {
+    clearBotAnswerSchedule();
+    return;
+  }
+
+  const key = `${currentQIdx}:${data.questionStartedAt}:${botPlayer.score}:${botPlayer.currentQ}`;
+  if (botAnswerKey === key && botAnswerTimeout) return;
+
+  clearBotAnswerSchedule();
+  botAnswerKey = key;
+
+  const remainingMs = getPlayerRemainingMs(botPlayer);
+  if (remainingMs <= 900) return;
+
+  const delay = Math.min(getRandomBotDelay(), Math.max(900, remainingMs - 500));
+  botAnswerTimeout = window.setTimeout(async () => {
+    const latestBot = playersData[BOT_ID];
+    if (!roomRef || !roomState || roomState.status !== "playing" || !latestBot || latestBot.currentQ >= currentQIdx) {
+      clearBotAnswerSchedule();
+      return;
+    }
+
+    const accuracy = getBotAccuracyByDifficulty(roomState.settings?.difficulty || "mixed");
+    const isCorrect = Math.random() < accuracy;
+    const nextScore = (latestBot.score || 0) + (isCorrect ? BASE_POINTS : -WRONG_PENALTY);
+
+    await roomRef.child(`players/${BOT_ID}`).update({
+      score: nextScore,
+      currentQ: currentQIdx,
+      correct: (latestBot.correct || 0) + (isCorrect ? 1 : 0)
+    });
+
+    clearBotAnswerSchedule();
+  }, delay);
 }
 
 function renderQuestion() {
@@ -589,7 +711,7 @@ function renderScores() {
     chip.className = "score-chip";
     chip.style.borderColor = player.color;
     chip.style.color = player.color;
-    chip.textContent = t().scoreChip(player.avatar || "🌍", player.name.split(" ")[0], player.score);
+    chip.textContent = t().scoreChip(player.avatar || "🌍", getDisplayPlayerName(player).split(" ")[0], player.score);
     els.qScores.appendChild(chip);
   });
 }
@@ -603,14 +725,14 @@ function renderLeaderLine() {
   }
   const second = sorted[1];
   if (!second) {
-    els.leaderLine.textContent = t().leaderSolo(leader.name);
+    els.leaderLine.textContent = t().leaderSolo(getDisplayPlayerName(leader));
     return;
   }
   const diff = leader.score - second.score;
   if (diff >= 20) {
-    els.leaderLine.textContent = t().leaderFire(leader.name);
+    els.leaderLine.textContent = t().leaderFire(getDisplayPlayerName(leader));
   } else if (diff > 0) {
-    els.leaderLine.textContent = t().leaderAhead(leader.name, second.name, diff);
+    els.leaderLine.textContent = t().leaderAhead(getDisplayPlayerName(leader), getDisplayPlayerName(second), diff);
   } else {
     els.leaderLine.textContent = t().leaderTie;
   }
@@ -758,10 +880,12 @@ async function maybeAdvanceGame(data) {
   advancingKey = advanceKey;
 
   if (questionIndex + 1 >= (data.questions || []).length) {
+    clearBotAnswerSchedule();
     await roomRef.update({ status: "finished" });
     return;
   }
 
+  clearBotAnswerSchedule();
   await roomRef.update({
     currentQ: questionIndex + 1,
     questionStartedAt: Date.now(),
@@ -801,7 +925,7 @@ function renderResults(data) {
   const iWon = me && winner && me.name === winner.name && me.score === winner.score && !tie;
 
   els.resTrophy.textContent = tie ? "🤝" : (iWon ? "🏆" : "😤");
-  els.resHeadline.textContent = tie ? t().resultTie : (iWon ? t().resultWinYou : t().resultWinOther(winner.name));
+  els.resHeadline.textContent = tie ? t().resultTie : (iWon ? t().resultWinYou : t().resultWinOther(getDisplayPlayerName(winner)));
   els.resSub.textContent = t().resultPlayersQuestions(sorted.length, gameQuestions.length);
   els.leaderboardTitle.textContent = t().leaderboardTitle;
 
@@ -812,7 +936,7 @@ function renderResults(data) {
     els.championCard.innerHTML = `
       <div class="champion-place">${t().placeLabel(1)}</div>
       <div class="champion-avatar" style="background:${winner.color}">${winner.avatar || "🌍"}</div>
-      <div class="champion-name">${winner.name}</div>
+      <div class="champion-name">${getDisplayPlayerName(winner)}</div>
       <div class="champion-score">${t().championScore(winner.score, winner.correct || 0, winnerAccuracy)}</div>
     `;
   }
@@ -830,7 +954,7 @@ function renderResults(data) {
       ${rankMarkup}
       <div class="avatar" style="background:${player.color}">${player.avatar || "🌍"}</div>
       <div class="sb-info">
-        <div class="sb-name">${player.name}</div>
+        <div class="sb-name">${getDisplayPlayerName(player)}</div>
         ${placeMarkup}
         <div class="sb-detail">${t().scoreDetail(player.score, player.correct || 0, accuracy)}</div>
       </div>
@@ -957,6 +1081,7 @@ function leaveRoom() {
 
 function goHome() {
   stopTimer();
+  clearBotAnswerSchedule();
 
   if (roomListener && roomRef) {
     roomRef.off("value", roomListener);
