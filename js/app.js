@@ -441,7 +441,7 @@ async function joinRoom() {
   }
 
   const playerCount = Object.keys(data.players || {}).length;
-  if (playerCount >= 4) {
+  if (playerCount >= 25) {
     els.joinError.textContent = t().roomFull;
     return;
   }
@@ -519,7 +519,7 @@ function renderLobby(data) {
     els.lobbyPlayers.appendChild(row);
   });
 
-  for (let i = players.length; i < 4; i += 1) {
+  for (let i = players.length; i < 25; i += 1) {
     const row = document.createElement("div");
     row.className = "player-slot waiting";
     row.innerHTML = `<div class="avatar"></div><span style="color:var(--muted)">${t().waitingPlayerSlot}</span>`;
